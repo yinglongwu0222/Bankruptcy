@@ -9,43 +9,53 @@
 This project implements an industrial-grade machine learning pipeline for corporate bankruptcy prediction. The core challenge in this actuarial domain is **extreme class imbalance** (6,819 healthy companies vs. 220 bankruptcies). Traditional classification models optimized for pure accuracy fail catastrophically in this scenario by ignoring the minority class. 
 
 This engine solves the imbalance problem through a rigorous two-pronged approach:
-1. **Data Level**: Implementation of `SMOTEENN` (Synthetic Minority Over-sampling Technique combined with Edited Nearest Neighbors), strictly isolated within a Stratified 5-Fold Cross-Validation loop to categorically prevent data leakage.
-2. **Algorithmic Level**: Development and injection of a mathematically derived **Custom Asymmetric Objective Function** from scratch, applying actuarial penalty weights directly into the XGBoost Newton-Raphson optimization process.
+1. **Data Level**: Implementation of `SMOTEENN`, strictly isolated within a Stratified 5-Fold Cross-Validation loop to categorically prevent data leakage.
+2. **Algorithmic Level**: Development of a **Custom Asymmetric Objective Function**, applying actuarial penalty weights directly into the XGBoost Newton-Raphson optimization process.
+
+---
+
+## 📂 Dataset Information
+
+The model is trained and validated using the **Company Bankruptcy Prediction** dataset, originally sourced from the **Taiwan Economic Journal (1999-2009)**. 
+
+* **Source**: [Kaggle - Company Bankruptcy Prediction](https://www.kaggle.com/datasets/pimishra/company-bankruptcy-prediction)
+* **Instance Count**: 6,819 companies
+* **Features**: 96 financial ratios (Net Value Per Share, Debt Ratio, etc.)
+* **Target**: `Bankrupt?` (Binary: 0 for healthy, 1 for bankrupt)
+
+> **Note**: To run this project locally, please download the `data.csv` from the link above and place it in the `/data` directory as `COMPANY BANKRUPTCY PREDICTION.csv`.
 
 ---
 
 ## 🔬 Mathematical Innovation: Asymmetric Log-Loss
 
-Standard logistic loss treats False Positives (misclassifying a healthy company) and False Negatives (missing a bankrupt company) equally. In financial risk management and credit scoring, a False Negative is exponentially more expensive. 
+In financial risk management, a False Negative (missing a bankruptcy) is exponentially more expensive than a False Positive. To address this, we derived a custom objective function for the XGBoost architecture. Let $p$ be the predicted probability after sigmoid transformation, and $y \in \{0, 1\}$ be the true label. We apply a penalty scalar $\alpha$ exclusively to the minority positive class ($y=1$).
 
-To address this, we derived a custom objective function for the XGBoost architecture. Let $p$ be the predicted probability after sigmoid transformation, and $y \in \{0, 1\}$ be the true label. We apply a penalty scalar $\alpha$ exclusively to the minority positive class ($y=1$).
 
-The 1st-order derivative (Gradient) and 2nd-order derivative (Hessian) are calculated from scratch:
+
+The 1st-order derivative (Gradient) and 2nd-order derivative (Hessian) are calculated from scratch to guide the tree-boosting process:
 
 $$ \text{Gradient}_i = \begin{cases} \alpha \cdot (p_i - 1) & \text{if } y_i = 1 \\ p_i & \text{if } y_i = 0 \end{cases} $$
 
 $$ \text{Hessian}_i = \begin{cases} \alpha \cdot p_i(1 - p_i) & \text{if } y_i = 1 \\ p_i(1 - p_i) & \text{if } y_i = 0 \end{cases} $$
 
-By feeding these modified gradients into the tree-boosting engine, the model is mathematically forced to prioritize the identification of failing companies, aligning the algorithm's objective with real-world actuarial loss functions.
+By injecting these derivatives, the model is mathematically forced to prioritize the identification of failing companies, aligning the algorithm's objective with real-world actuarial loss functions.
 
 ---
 
-## 🏗️ Architecture & Leakage Prevention (Zero Data Leakage)
+## 🏗️ Architecture & Leakage Prevention
 
-A common and critical pitfall in handling imbalanced data is applying sampling techniques (like SMOTE) or scaling to the entire dataset prior to Cross-Validation. This leads to severe data leakage and artificially inflated performance metrics. 
+This project utilizes `imblearn.pipeline.Pipeline` to bind transformers into a strict **Directed Acyclic Graph (DAG)**, ensuring the validation fold remains absolutely untouched during feature selection and resampling:
 
-This project completely eradicates this flaw by utilizing `imblearn.pipeline.Pipeline` to bind the transformers into a strict **Directed Acyclic Graph (DAG)**:
-1. **Pearson & VIF Filter**: Stateful removal of multicollinear features (VIF > 10.0), with thresholds learned *strictly* from the training fold.
-2. **SMOTEENN Resampling**: Synthetic minority generation applied *only* to the training matrix.
-3. **Estimator**: XGBoost or Logistic Regression fitting.
-
-This architecture ensures the Validation Fold remains absolutely untouched, providing a mathematically sound and reliable estimate of out-of-sample performance.
+1.  **Pearson & Recursive VIF Filter**: Stateful removal of multicollinear features (threshold > 0.7, VIF > 10.0).
+2.  **SMOTEENN Resampling**: Synthetic minority generation and noise cleaning applied *only* to the training matrix.
+3.  **Estimator**: XGBoost (with Custom Loss) or Logistic Regression fitting.
 
 ---
 
 ## 📈 Key Results (5-Fold Stratified CV)
 
-The integration of rigorous sampling and custom loss functions drastically transformed the models' ability to detect defaults:
+The integration of rigorous sampling and custom loss functions drastically transformed the model's ability to detect defaults:
 
 | Architecture | Resampling Strategy | Mean Recall (Sensitivity) | Mean AUC | Mean F1-Score |
 | :--- | :--- | :--- | :--- | :--- |
@@ -54,7 +64,7 @@ The integration of rigorous sampling and custom loss functions drastically trans
 | **XGBoost (Custom Loss)** | Baseline (None) | 0.284 | 0.936 | 0.359 |
 | **XGBoost (Custom Loss)** | **SMOTEENN** | **0.699** | **0.927** | 0.379 |
 
-*Insight: Logistic Regression + SMOTEENN achieves the highest Recall (0.818), making it highly sensitive to defaults. XGBoost + SMOTEENN offers the best balance with a strong Recall (0.699) while maintaining an exceptional AUC (0.927).*
+*Note: Visual reports including ROC Curves, Confusion Matrices, and Feature Importances are automatically generated in the `/results` directory.*
 
 ---
 
@@ -62,32 +72,31 @@ The integration of rigorous sampling and custom loss functions drastically trans
 
 ```text
 Bankruptcy/
-├── data/
-│   └── COMPANY BANKRUPTCY PREDICTION.csv
-├── results/                  # Auto-generated visual reports
+├── data/                 # Dataset placeholder (.gitkeep)
+├── results/              # Auto-generated categorized visual reports
 │   ├── confusion_matrices/
 │   ├── feature_importance/
 │   └── roc_curves/
-├── src/
-│   ├── config/               # Factory pattern for immutable hyperparameters
-│   ├── data/                 # Ingestion and hold-out splitting engine
-│   ├── evaluation/           # Automated and categorized plotting engine
-│   ├── features/             # Stateful VIF preprocessor & Sampler factory
-│   ├── models/               # Base estimators and Custom Math Engines
-│   └── pipeline/             # Strict CV and Imblearn DAG orchestration
-├── main.py                   # System entry point
-└── README.md
+├── src/                  # Modular source code
+│   ├── config/           # Model hyperparameters
+│   ├── data/             # Ingestion and hold-out splitting
+│   ├── evaluation/       # Visualizer engine
+│   ├── features/         # VIF preprocessor & Sampler factory
+│   ├── models/           # Custom Asymmetric Engine
+│   └── pipeline/         # Training orchestrator
+├── main.py               # System entry point
+├── .gitignore            # Industrial-grade exclusion rules
+└── requirements.txt      # Pinned dependencies
 ```
 
 ## 🚀 How to Run
 
-1. Ensure Python environment is properly configured.
+1. Ensure Python 3.10+ is installed.
 2. Install dependencies:
    ```bash
-   pip install pandas numpy scikit-learn xgboost imbalanced-learn statsmodels matplotlib seaborn
+   pip install -r requirements.txt
    ```
-3. Execute the full orchestrator to run K-Fold CV, production fitting, and automatic generation of all evaluation plots:
+3. Execute the full orchestrator:
    ```bash
    python main.py
    ```
-*Note: Depending on CPU architecture (e.g., Apple Silicon), the VIF recursive feature elimination step may take 1-3 minutes. Real-time progress logs are printed to the console.*
