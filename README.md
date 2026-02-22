@@ -64,7 +64,10 @@ The integration of rigorous sampling and custom loss functions drastically trans
 | **XGBoost (Custom Loss)** | Baseline (None) | 0.284 | 0.936 | 0.359 |
 | **XGBoost (Custom Loss)** | **SMOTEENN** | **0.699** | **0.927** | 0.379 |
 
-*Note: Visual reports including ROC Curves, Confusion Matrices, and Feature Importances are automatically generated in the `/results` directory.*
+### 🖼️ Performance Visualization (Top Performer)
+Below is the Confusion Matrix for the **Logistic Regression + SMOTEENN** model (0.818 Recall):
+
+![Confusion Matrix](results/confusion_matrices/cm_logistic_smoteenn.png)
 
 ---
 
