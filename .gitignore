@@ -1,21 +1,21 @@
 # --- [1] Data Protection ---
-# Keep the directory but ignore raw big data (following industry best practices)
+# Prevents accidentally adding new massive datasets
 data/*.csv
 data/*.xlsx
 data/*.zip
+# Keep the directory structure
 !data/.gitkeep
 
 # --- [2] Artifacts & Results ---
-# We explicitly track performance plots for portfolio display
-!results/**/*.png
+# This matches your current GitHub state: folders exist and images are tracked
 !results/**/.gitkeep
+!results/**/*.png
 
-# --- [3] Python Environment & System ---
+# --- [3] Python & System ---
 __pycache__/
 *.py[cod]
 .venv/
 venv/
-.env
 .vscode/
 .idea/
 .DS_Store
