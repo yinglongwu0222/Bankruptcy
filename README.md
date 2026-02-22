@@ -1,58 +1,93 @@
-# Corporate Default Risk Modeling: An Actuarial Machine Learning Pipeline 📉🤖
+# 🏦 Actuarial Corporate Bankruptcy Prediction Engine
 
-**Domain**: Quantitative Finance & Actuarial Science | **Focus**: Extreme Class Imbalance & Model Explainability (XAI)
+![Python](https://img.shields.io/badge/Python-3.10%2B-blue?style=flat-square&logo=python)
+![Scikit-Learn](https://img.shields.io/badge/scikit--learn-Pipeline-orange?style=flat-square&logo=scikitlearn)
+![XGBoost](https://img.shields.io/badge/XGBoost-Custom_Loss-green?style=flat-square)
+![Imbalanced-Learn](https://img.shields.io/badge/Imbalanced--Learn-SMOTEENN-red?style=flat-square)
 
 ## 📊 Executive Summary
-In financial risk management, predicting corporate bankruptcy is fundamentally a "rare event" modeling problem. This project provides an end-to-end, highly automated machine learning pipeline to assess corporate default risk based on financial indicators. 
+This project implements an industrial-grade machine learning pipeline for corporate bankruptcy prediction. The core challenge in this actuarial domain is **extreme class imbalance** (6,819 healthy companies vs. 220 bankruptcies). Traditional classification models optimized for pure accuracy fail catastrophically in this scenario by ignoring the minority class. 
 
-Developed with rigorous quantitative standards, the pipeline successfully isolates the signal from the noise in highly skewed financial datasets (**6,819 total companies, but only 220 actual defaults/bankruptcies**).
+This engine solves the imbalance problem through a rigorous two-pronged approach:
+1. **Data Level**: Implementation of `SMOTEENN` (Synthetic Minority Over-sampling Technique combined with Edited Nearest Neighbors), strictly isolated within a Stratified 5-Fold Cross-Validation loop to categorically prevent data leakage.
+2. **Algorithmic Level**: Development and injection of a mathematically derived **Custom Asymmetric Objective Function** from scratch, applying actuarial penalty weights directly into the XGBoost Newton-Raphson optimization process.
 
-## 🗄️ Data Provenance & Structure
-The dataset used in this pipeline is sourced from public records on **Kaggle** (originally compiled from the Taiwan Economic Journal). It encompasses 6,819 corporate entities and an initial set of 95 distinct financial features, targeting the binary indicator `Bankrupt?`.
+---
 
-*Note: Adhering to enterprise data-sharing best practices, the raw dataset is excluded from version control via `.gitignore`.*
-**Data Setup Instruction**: To replicate this project locally, source the dataset from Kaggle and place it precisely at `data/COMPANY BANKRUPTCY PREDICTION.csv` to match the pipeline configuration.
+## 🔬 Mathematical Innovation: Asymmetric Log-Loss
 
-## 🧠 Key Quantitative Discoveries
-Extensive benchmarking across multiple algorithms and sampling strategies yielded the following actionable insights for credit risk assessment:
+Standard logistic loss treats False Positives (misclassifying a healthy company) and False Negatives (missing a bankrupt company) equally. In financial risk management and credit scoring, a False Negative is exponentially more expensive. 
 
-1. **Optimal Risk Identification**: The **Random Forest** model paired with **SMOTEENN** sampling achieved an exceptional **Recall of 0.77**. In a real-world actuarial context, this implies the model successfully flagged 77% of actual defaulting companies, making it the most conservative and protective configuration for portfolio risk management.
-2. **Best Balanced Performance**: **XGBoost** consistently outperformed other models across most sampling methods, offering the optimal trade-off between Precision and Recall (captured via highest AUC and MCC metrics).
-3. **Feature Dimensionality Reduction**: Utilizing Variance Inflation Factor (VIF < 10) filtering to eliminate multicollinearity, combined with **SHAP** (SHapley Additive exPlanations) values and LightGBM analysis, the initial 95 financial indicators were aggressively pruned to the **top 30 most predictive features**, drastically reducing computational overhead while enhancing model transparency.
+To address this, we derived a custom objective function for the XGBoost architecture. Let $p$ be the predicted probability after sigmoid transformation, and $y \in \{0, 1\}$ be the true label. We apply a penalty scalar $\alpha$ exclusively to the minority positive class ($y=1$).
 
-## 🗂 Project Architecture
-The codebase is structured for scalability and decoupled configuration:
+The 1st-order derivative (Gradient) and 2nd-order derivative (Hessian) are calculated from scratch:
 
-    project_root/
-    ├── config/          # config.yaml (Pipeline toggles, exact paths, top_k=30)
-    ├── data/            # Local directory for COMPANY BANKRUPTCY PREDICTION.csv
-    ├── processing/      # Core logic: feature_selection, sampler, data_loader
-    ├── models/          # ML algorithms and model_configs
-    ├── evaluation/      # Metrics calculation and visualizer (ROC/PR Curves)
-    ├── results/         # Auto-generates /roc_curves, /pr_curves, /confusion_matrices
-    ├── requirements.txt # Environment lock file (Strictly versioned, Py 3.12+)
-    └── run.py           # Main execution script
+$$ \text{Gradient}_i = \begin{cases} \alpha \cdot (p_i - 1) & \text{if } y_i = 1 \\ p_i & \text{if } y_i = 0 \end{cases} $$
 
-## 🚀 Reproduction & Execution
+$$ \text{Hessian}_i = \begin{cases} \alpha \cdot p_i(1 - p_i) & \text{if } y_i = 1 \\ p_i(1 - p_i) & \text{if } y_i = 0 \end{cases} $$
 
-This pipeline has been fully tested and optimized for modern architecture (e.g., Apple Silicon / M-Series, Python 3.12).
+By feeding these modified gradients into the tree-boosting engine, the model is mathematically forced to prioritize the identification of failing companies, aligning the algorithm's objective with real-world actuarial loss functions.
 
-### Step 1: Environment Setup
-Ensure you have your quantitative environment ready. The precise dependencies are cleanly locked in `requirements.txt`.
+---
 
-    # Activate your data science environment
-    conda activate ds_quant
+## 🏗️ Architecture & Leakage Prevention (Zero Data Leakage)
 
-    # Install dependencies
-    pip install -r requirements.txt
+A common and critical pitfall in handling imbalanced data is applying sampling techniques (like SMOTE) or scaling to the entire dataset prior to Cross-Validation. This leads to severe data leakage and artificially inflated performance metrics. 
 
-### Step 2: Run the Pipeline
+This project completely eradicates this flaw by utilizing `imblearn.pipeline.Pipeline` to bind the transformers into a strict **Directed Acyclic Graph (DAG)**:
+1. **Pearson & VIF Filter**: Stateful removal of multicollinear features (VIF > 10.0), with thresholds learned *strictly* from the training fold.
+2. **SMOTEENN Resampling**: Synthetic minority generation applied *only* to the training matrix.
+3. **Estimator**: XGBoost or Logistic Regression fitting.
 
-    python run.py
+This architecture ensures the Validation Fold remains absolutely untouched, providing a mathematically sound and reliable estimate of out-of-sample performance.
 
-*Note: A complete pipeline execution—evaluating 5 sampling methods across 5 models with full feature engineering—completes in approximately 3.5 minutes on standard M-Series hardware.*
+---
 
-## 📈 Outputs & Visual Analytics
-All experiment artifacts are automatically generated in the `results/` directory, providing risk managers with:
-- **Financial Metrics**: F1-Score, Recall, Precision, MCC, ROC-AUC (summarized in `results_summary.csv`).
-- **Visual Analytics**: Individual ROC/PR curves for all model combinations, Confusion Matrices, and Correlation Heatmaps.
+## 📈 Key Results (5-Fold Stratified CV)
+
+The integration of rigorous sampling and custom loss functions drastically transformed the models' ability to detect defaults:
+
+| Architecture | Resampling Strategy | Mean Recall (Sensitivity) | Mean AUC | Mean F1-Score |
+| :--- | :--- | :--- | :--- | :--- |
+| **Logistic Regression** | Baseline (None) | 0.193 | 0.912 | 0.274 |
+| **Logistic Regression** | **SMOTEENN** | **0.818** | 0.907 | 0.259 |
+| **XGBoost (Custom Loss)** | Baseline (None) | 0.284 | 0.936 | 0.359 |
+| **XGBoost (Custom Loss)** | **SMOTEENN** | **0.699** | **0.927** | 0.379 |
+
+*Insight: Logistic Regression + SMOTEENN achieves the highest Recall (0.818), making it highly sensitive to defaults. XGBoost + SMOTEENN offers the best balance with a strong Recall (0.699) while maintaining an exceptional AUC (0.927).*
+
+---
+
+## 🗂️ Repository Structure
+
+```text
+Bankruptcy/
+├── data/
+│   └── COMPANY BANKRUPTCY PREDICTION.csv
+├── results/                  # Auto-generated visual reports
+│   ├── confusion_matrices/
+│   ├── feature_importance/
+│   └── roc_curves/
+├── src/
+│   ├── config/               # Factory pattern for immutable hyperparameters
+│   ├── data/                 # Ingestion and hold-out splitting engine
+│   ├── evaluation/           # Automated and categorized plotting engine
+│   ├── features/             # Stateful VIF preprocessor & Sampler factory
+│   ├── models/               # Base estimators and Custom Math Engines
+│   └── pipeline/             # Strict CV and Imblearn DAG orchestration
+├── main.py                   # System entry point
+└── README.md
+```
+
+## 🚀 How to Run
+
+1. Ensure Python environment is properly configured.
+2. Install dependencies:
+   ```bash
+   pip install pandas numpy scikit-learn xgboost imbalanced-learn statsmodels matplotlib seaborn
+   ```
+3. Execute the full orchestrator to run K-Fold CV, production fitting, and automatic generation of all evaluation plots:
+   ```bash
+   python main.py
+   ```
+*Note: Depending on CPU architecture (e.g., Apple Silicon), the VIF recursive feature elimination step may take 1-3 minutes. Real-time progress logs are printed to the console.*

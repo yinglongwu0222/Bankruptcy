@@ -1,15 +1,45 @@
-# Environments & Cache
-__pycache__/
-*.pyc
+# --- [1] 核心数据与结果保护 (量化项目禁忌) ---
+# 绝不上传原始数据，防止泄密或超过 GitHub 文件大小限制
+data/*.csv
+data/*.xlsx
+data/*.zip
+data/*.parquet
 
-# IDE & OS Files
-.idea/
-.vscode/
-.DS_Store
+# 忽略所有生成的图表和结果，但保留目录结构
+results/**/*
+!results/**/.gitkeep
 
-# Datasets (Excluded for compliance and size)
-data/
-
-# Internal Documentation & Reports
+# 忽略根目录下的 PDF 报告 (建议通过 Release 或文档链接发布)
 *.pdf
-*.docx
+
+# --- [2] Python 环境与缓存 ---
+__pycache__/
+**/*.py[cod]
+**/*$py.class
+.ipynb_checkpoints/
+
+# 环境目录
+venv/
+env/
+.env
+.venv/
+build/
+dist/
+*.egg-info/
+
+# --- [3] 日志与调试 ---
+*.log
+logs/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# --- [4] IDE 与系统垃圾 (全路径保护) ---
+.vscode/
+.idea/
+.DS_Store
+**/.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+ehthumbs.db
