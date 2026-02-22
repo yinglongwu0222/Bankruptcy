@@ -1,45 +1,22 @@
-# --- [1] Data & Artifact Protection (Strict Policy) ---
-# Never upload raw datasets to prevent leaks or GitHub file size limits
+# --- [1] Data Protection ---
+# Keep the directory but ignore raw big data (following industry best practices)
 data/*.csv
 data/*.xlsx
 data/*.zip
-data/*.parquet
+!data/.gitkeep
 
-# Ignore all generated plots and metrics but keep directory structure
-results/**/*
+# --- [2] Artifacts & Results ---
+# We explicitly track performance plots for portfolio display
+!results/**/*.png
 !results/**/.gitkeep
 
-# Ignore PDF reports (Distribute via Releases or external links)
-*.pdf
-
-# --- [2] Python Environment & Cache ---
+# --- [3] Python Environment & System ---
 __pycache__/
-**/*.py[cod]
-**/*$py.class
-.ipynb_checkpoints/
-
-# Virtual environments
-venv/
-env/
-.env
+*.py[cod]
 .venv/
-build/
-dist/
-*.egg-info/
-
-# --- [3] Logging & Debugging ---
-*.log
-logs/
-.pytest_cache/
-.coverage
-htmlcov/
-
-# --- [4] IDE & System Artifacts (Full Path Protection) ---
+venv/
+.env
 .vscode/
 .idea/
 .DS_Store
-**/.DS_Store
-.AppleDouble
-.LSOverride
-Thumbs.db
-ehthumbs.db
+*.pdf
