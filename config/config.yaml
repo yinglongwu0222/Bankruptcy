@@ -1,0 +1,22 @@
+random_seed: 42
+test_size: 0.2
+data_path: data/COMPANY BANKRUPTCY PREDICTION.csv
+target_col: Bankrupt?
+sampling_methods:
+  - None
+  - RandomOverSampler
+  - SMOTE
+  - ADASYN
+  # - NearMiss
+  - SMOTEENN
+models:
+  - logistic
+  - svm
+  - random_forest
+  - gbdt
+  - xgboost
+feature_selection:
+  method: combined
+  top_k: 30
+  corr_threshold: 0.8
+  vif_threshold: 10.0
