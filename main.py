@@ -29,7 +29,7 @@ def main():
     # 2. Strict Hold-out Split (20% isolated for final production test)
     X_train, X_test, y_train, y_test = data_engine.create_stratified_split(df_raw)
 
-    # 3. Initialize Visualizer (Fix: Param name updated to base_dir)
+    # 3. Initialize Visualizer
     visualizer = ActuarialVisualizer(base_dir="results")
 
     # 4. Define the experiment grid
@@ -45,7 +45,9 @@ def main():
             sampler = SamplerFactory.get_sampler(method_name=sampler_name)
             params = ModelConfigFactory.get_params(model_name)
             
-            use_custom_loss = (model_name == "xgboost")
+            # 【外科手术修复 1】：逻辑互斥设计 (A/B Test)
+            use_custom_loss = (model_name == "xgboost" and sampler_name.lower() == "none")
+            
             classifier = ActuarialModelEngine(
                 model_name=model_name, 
                 params=params, 
@@ -69,12 +71,13 @@ def main():
             logger.info("Executing inference on untouched Hold-out Test Set...")
             y_pred = pipeline_engine.predict_production(X_test)
             
-            # Extract probabilities safely
-            model_step = pipeline_engine.pipeline.named_steps['model']
-            if hasattr(model_step, "predict_proba"):
+            # 【架构修复】：必须通过 pipeline.predict_proba 调用！
+            # 确保 X_test 先经过 preprocessor 降维 (96 -> 58 特征)，再进入分类器，防止维度灾难
+            try:
                 y_proba = pipeline_engine.pipeline.predict_proba(X_test)[:, 1]
-            else:
+            except (NotImplementedError, AttributeError):
                 y_proba = y_pred
+                logger.warning("Fallback to hard labels for ROC generation.")
 
             # Generate Plots
             plot_identifier = f"{model_name}_{sampler_name}"
@@ -85,6 +88,7 @@ def main():
             try:
                 fitted_preprocessor = pipeline_engine.pipeline.named_steps['preprocessor']
                 feature_names = fitted_preprocessor.selected_features_
+                model_step = pipeline_engine.pipeline.named_steps['model']
                 
                 if model_name in ["xgboost", "random_forest"]:
                     importances = model_step.model.feature_importances_

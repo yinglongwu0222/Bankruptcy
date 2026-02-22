@@ -54,8 +54,8 @@ class ActuarialModelEngine(BaseEstimator, ClassifierMixin):
         [Implemented From Scratch]: Custom Asymmetric Objective Function.
         Adjusted for modern XGBoost API where labels are passed directly.
         """
-        # XGBoost margin output requires sigmoid transformation
-        p = 1.0 / (1.0 + np.exp(-preds))
+        # Numerically stable sigmoid mapped from log-odds margin
+        p = 1.0 / (1.0 + np.exp(-np.clip(preds, -15, 15)))
         
         # Actuarial penalty for False Negatives (Missing a bankruptcy)
         alpha = 5.0 
@@ -79,7 +79,22 @@ class ActuarialModelEngine(BaseEstimator, ClassifierMixin):
         return self.model.predict(X)
 
     def predict_proba(self, X: pd.DataFrame) -> np.ndarray:
-        if hasattr(self.model, "predict_proba"):
+        """
+        Executes probability inference with safe Margin-to-Sigmoid mapping 
+        for custom objective functions.
+        """
+        if self.model_name == "xgboost" and self.custom_loss:
+            # 【外科手术修复 2】：概率防坍塌补丁
+            # 提取 Booster 原生 margin 预测，并强制映射回 [0, 1] 概率空间
+            dmatrix = xgb.DMatrix(X)
+            margin = self.model.get_booster().predict(dmatrix, output_margin=True)
+            
+            # 使用截断避免 exp 溢出导致 NaNs
+            prob_1 = 1.0 / (1.0 + np.exp(-np.clip(margin, -15, 15)))
+            prob_0 = 1.0 - prob_1
+            return np.vstack((prob_0, prob_1)).T
+            
+        elif hasattr(self.model, "predict_proba"):
             return self.model.predict_proba(X)
         else:
             logger.error(f"Model {self.model_name} does not support probability estimation.")

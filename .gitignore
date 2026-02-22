@@ -1,15 +1,17 @@
 # --- [1] Data Protection ---
-# Prevents accidentally adding new massive datasets
-data/*.csv
-data/*.xlsx
-data/*.zip
-# Keep the directory structure
+# Strictly ignore all files under data/, preserving only the directory structure
+data/*
 !data/.gitkeep
 
-# --- [2] Artifacts & Results ---
-# This matches your current GitHub state: folders exist and images are tracked
-!results/**/.gitkeep
+# --- [2] Artifacts & Results (Whitelist Approach) ---
+# Ignore all generated backtest artifacts under results/
+results/*
+# Whitelist specific subdirectories, PNG plots, and gitkeep files
+!results/**/
 !results/**/*.png
+!results/**/.gitkeep
+# Intercept all runtime log files
+*.log
 
 # --- [3] Python & System ---
 __pycache__/
@@ -20,3 +22,4 @@ venv/
 .idea/
 .DS_Store
 *.pdf
+.ipynb_checkpoints/

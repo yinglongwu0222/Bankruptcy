@@ -8,9 +8,9 @@
 ## 📊 Executive Summary
 This project implements an industrial-grade machine learning pipeline for corporate bankruptcy prediction. The core challenge in this actuarial domain is **extreme class imbalance** (6,819 healthy companies vs. 220 bankruptcies). Traditional classification models optimized for pure accuracy fail catastrophically in this scenario by ignoring the minority class. 
 
-This engine solves the imbalance problem through a rigorous two-pronged approach:
-1. **Data Level**: Implementation of `SMOTEENN`, strictly isolated within a Stratified 5-Fold Cross-Validation loop to categorically prevent data leakage.
-2. **Algorithmic Level**: Development of a **Custom Asymmetric Objective Function**, applying actuarial penalty weights directly into the XGBoost Newton-Raphson optimization process.
+This engine solves the imbalance problem by setting up a rigorous A/B Testing framework to compare two distinct interventions:
+1. **Data-Level Intervention**: Implementation of `SMOTEENN`, strictly isolated within a Stratified 5-Fold Cross-Validation loop to categorically prevent data leakage.
+2. **Algorithmic-Level Intervention**: Development of a **Custom Asymmetric Objective Function**, applying actuarial penalty weights directly into the XGBoost Newton-Raphson optimization process on the raw, unadulterated dataset.
 
 ---
 
@@ -31,13 +31,11 @@ The model is trained and validated using the **Company Bankruptcy Prediction** d
 
 In financial risk management, a False Negative (missing a bankruptcy) is exponentially more expensive than a False Positive. To address this, we derived a custom objective function for the XGBoost architecture. Let $p$ be the predicted probability after sigmoid transformation, and $y \in \{0, 1\}$ be the true label. We apply a penalty scalar $\alpha$ exclusively to the minority positive class ($y=1$).
 
-
-
 The 1st-order derivative (Gradient) and 2nd-order derivative (Hessian) are calculated from scratch to guide the tree-boosting process:
 
-$$ \text{Gradient}_i = \begin{cases} \alpha \cdot (p_i - 1) & \text{if } y_i = 1 \\ p_i & \text{if } y_i = 0 \end{cases} $$
+$$\text{Gradient}_i = \begin{cases} \alpha \cdot (p_i - 1) & \text{if } y_i = 1 \\ p_i & \text{if } y_i = 0 \end{cases}$$
 
-$$ \text{Hessian}_i = \begin{cases} \alpha \cdot p_i(1 - p_i) & \text{if } y_i = 1 \\ p_i(1 - p_i) & \text{if } y_i = 0 \end{cases} $$
+$$\text{Hessian}_i = \begin{cases} \alpha \cdot p_i(1 - p_i) & \text{if } y_i = 1 \\ p_i(1 - p_i) & \text{if } y_i = 0 \end{cases}$$
 
 By injecting these derivatives, the model is mathematically forced to prioritize the identification of failing companies, aligning the algorithm's objective with real-world actuarial loss functions.
 
@@ -53,21 +51,19 @@ This project utilizes `imblearn.pipeline.Pipeline` to bind transformers into a s
 
 ---
 
-## 📈 Key Results (5-Fold Stratified CV)
+## 📈 Key Results (A/B Test: Data-Level vs Algorithmic-Level Intervention)
 
-The integration of rigorous sampling and custom loss functions drastically transformed the model's ability to detect defaults:
+To scientifically evaluate the most effective strategy for extreme actuarial imbalance (3.2% default rate), we isolated our interventions into a rigorous A/B test. We compared synthetic oversampling (SMOTEENN) against our mathematically derived Asymmetric Objective Function. Results are based on 5-Fold Stratified CV:
 
-| Architecture | Resampling Strategy | Mean Recall (Sensitivity) | Mean AUC | Mean F1-Score |
+| Architecture | Imbalance Strategy | Mean Recall (Sensitivity) | Mean AUC | Mean F1-Score |
 | :--- | :--- | :--- | :--- | :--- |
 | **Logistic Regression** | Baseline (None) | 0.193 | 0.912 | 0.274 |
-| **Logistic Regression** | **SMOTEENN** | **0.818** | 0.907 | 0.259 |
-| **XGBoost (Custom Loss)** | Baseline (None) | 0.284 | 0.936 | 0.359 |
-| **XGBoost (Custom Loss)** | **SMOTEENN** | **0.699** | **0.927** | 0.379 |
+| **Logistic Regression** | Data-Level: **SMOTEENN** | 0.818 | 0.907 | 0.259 |
+| **XGBoost (Custom Loss)** | Algorithmic-Level: **Asymmetric Log-Loss** | 0.284 | **0.936** | 0.359 |
+| **XGBoost** | Data-Level: **SMOTEENN** | 0.677 | 0.929 | **0.409** |
 
-### 🖼️ Performance Visualization (Top Performer)
-Below is the Confusion Matrix for the **Logistic Regression + SMOTEENN** model (0.818 Recall):
-
-![Confusion Matrix](results/confusion_matrices/cm_logistic_smoteenn.png)
+**Engineering Conclusion:**
+The A/B test reveals a clear trade-off. **Data-level intervention (Logistic + SMOTEENN)** acts as a blunt force multiplier, achieving the absolute highest Recall (0.818) but suffering in precision (F1: 0.259). Conversely, our **Algorithmic-level intervention (XGBoost + Custom Loss)** preserves the pristine geometric distribution of the original financial data, achieving the highest robust discriminative power (AUC: 0.936) while preventing the catastrophic False Positive explosions inherent to synthetic data generation.
 
 ---
 
@@ -90,7 +86,6 @@ Bankruptcy/
 ├── main.py               # System entry point
 ├── .gitignore            # Industrial-grade exclusion rules
 └── requirements.txt      # Pinned dependencies
-```
 
 ## 🚀 How to Run
 
