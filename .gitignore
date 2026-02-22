@@ -1,24 +1,24 @@
-# --- [1] 核心数据与结果保护 (量化项目禁忌) ---
-# 绝不上传原始数据，防止泄密或超过 GitHub 文件大小限制
+# --- [1] Data & Artifact Protection (Strict Policy) ---
+# Never upload raw datasets to prevent leaks or GitHub file size limits
 data/*.csv
 data/*.xlsx
 data/*.zip
 data/*.parquet
 
-# 忽略所有生成的图表和结果，但保留目录结构
+# Ignore all generated plots and metrics but keep directory structure
 results/**/*
 !results/**/.gitkeep
 
-# 忽略根目录下的 PDF 报告 (建议通过 Release 或文档链接发布)
+# Ignore PDF reports (Distribute via Releases or external links)
 *.pdf
 
-# --- [2] Python 环境与缓存 ---
+# --- [2] Python Environment & Cache ---
 __pycache__/
 **/*.py[cod]
 **/*$py.class
 .ipynb_checkpoints/
 
-# 环境目录
+# Virtual environments
 venv/
 env/
 .env
@@ -27,14 +27,14 @@ build/
 dist/
 *.egg-info/
 
-# --- [3] 日志与调试 ---
+# --- [3] Logging & Debugging ---
 *.log
 logs/
 .pytest_cache/
 .coverage
 htmlcov/
 
-# --- [4] IDE 与系统垃圾 (全路径保护) ---
+# --- [4] IDE & System Artifacts (Full Path Protection) ---
 .vscode/
 .idea/
 .DS_Store
