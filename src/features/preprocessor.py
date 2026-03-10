@@ -22,15 +22,14 @@ class FinancialFeatureSelector(BaseEstimator, TransformerMixin):
         X_clean = X.replace([np.inf, -np.inf], np.nan).dropna(axis=1)
         X_clean = X_clean.loc[:, X_clean.nunique() > 1].copy()
         
-        # 2. Strong Pearson Filtering (Pre-emptive Strike)
-        # 先杀掉一批相关性极高的，缓解 VIF 压力
+        # 2. Filter high correlation features first
         corr_matrix = X_clean.corr().abs()
         upper = corr_matrix.where(np.triu(np.ones(corr_matrix.shape), k=1).astype(bool))
         to_drop_corr = [col for col in upper.columns if any(upper[col] > self.corr_threshold)]
         X_clean = X_clean.drop(columns=to_drop_corr)
         logger.info(f"Dropped {len(to_drop_corr)} highly correlated features. Remaining: {X_clean.shape[1]}")
 
-        # 3. VIF Filtering with Progress Heartbeat
+        # 3. VIF Selection
         X_scaled = pd.DataFrame(
             self.scaler.fit_transform(X_clean),
             columns=X_clean.columns,
@@ -38,11 +37,11 @@ class FinancialFeatureSelector(BaseEstimator, TransformerMixin):
         )
 
         current_cols = X_clean.columns.tolist()
-        logger.info("Entering VIF Iteration. This may take 1-2 minutes on Apple Silicon...")
+        logger.info("Starting VIF selection...")
         
         iteration = 0
         while True:
-            # 这是一个非常耗时的计算过程
+            # Calculate VIF
             vif_values = [
                 variance_inflation_factor(X_scaled[current_cols].values, i)
                 for i in range(len(current_cols))
@@ -53,16 +52,21 @@ class FinancialFeatureSelector(BaseEstimator, TransformerMixin):
                 max_idx = vif_values.index(max_vif)
                 dropped_feature = current_cols.pop(max_idx)
                 iteration += 1
-                # 关键：实时打印进度，防止你觉得它卡死
+                # Print progress
                 print(f"  > [VIF Step {iteration}] Dropped: {dropped_feature} (VIF: {max_vif:.2f})")
             else:
                 break
 
         self.selected_features_ = current_cols
+        
+        # Refit scaler on final features
+        self.scaler.fit(X_clean[self.selected_features_])
+        
         logger.info(f"Feature Selection Complete. Final features: {len(self.selected_features_)}")
         return self
 
     def transform(self, X: pd.DataFrame) -> pd.DataFrame:
-        X_selected = X[self.selected_features_]
+        # Ensure test data is clean (handle inf/nan) before scaling to prevent runtime crashes
+        X_selected = X[self.selected_features_].replace([np.inf, -np.inf], np.nan).fillna(0)
         X_transformed = self.scaler.transform(X_selected)
         return pd.DataFrame(X_transformed, columns=self.selected_features_, index=X.index)

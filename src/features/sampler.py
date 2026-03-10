@@ -1,6 +1,5 @@
 """
-Imbalanced data resampling factory.
-Provides standardized access to imblearn algorithms for pipeline integration.
+Sampler factory.
 """
 
 import logging
@@ -15,8 +14,7 @@ logger = logging.getLogger(__name__)
 
 class SamplerFactory:
     """
-    Factory pattern to generate uninitialized resampling objects.
-    Ensures safe instantiation before injection into the main Pipeline.
+    Helper to get sampler instances.
     """
 
     @staticmethod

@@ -1,7 +1,5 @@
 """
-Advanced actuarial modeling engine.
-Wraps standard algorithms into a unified OOP interface and implements 
-mathematically derived custom objective functions for extreme class imbalance.
+Model wrapper for classifiers and custom loss functions.
 """
 
 import logging
@@ -19,8 +17,7 @@ logger = logging.getLogger(__name__)
 
 class ActuarialModelEngine(BaseEstimator, ClassifierMixin):
     """
-    Unified industrial wrapper for machine learning classifiers.
-    Injects custom objective functions for rare-event (default) prediction.
+    Wrapper for classifiers.
     """
 
     def __init__(self, model_name: str, params: Dict[str, Any], custom_loss: bool = False):
@@ -30,8 +27,8 @@ class ActuarialModelEngine(BaseEstimator, ClassifierMixin):
         self.model = self._initialize_model()
 
     def _initialize_model(self) -> BaseEstimator:
-        """Instantiates the specified algorithm with rigorous error handling."""
-        logger.info(f"Initializing predictive engine: {self.model_name.upper()}")
+        """Initializes the model."""
+        logger.info(f"Initializing model: {self.model_name.upper()}")
         
         if self.model_name == "logistic":
             return LogisticRegression(**self.params)
@@ -44,15 +41,14 @@ class ActuarialModelEngine(BaseEstimator, ClassifierMixin):
                 # Remove standard metric to utilize custom Hessian/Gradient calculation
                 self.params.pop("eval_metric", None)
                 self.params["objective"] = self._asymmetric_log_loss
-                logger.warning("Custom Asymmetric Objective Function injected into XGBoost.")
+                logger.warning("Using custom asymmetric loss.")
             return xgb.XGBClassifier(**self.params)
         else:
             raise ValueError(f"Architecture '{self.model_name}' is not supported in the engine.")
 
     def _asymmetric_log_loss(self, labels: np.ndarray, preds: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         """
-        [Implemented From Scratch]: Custom Asymmetric Objective Function.
-        Adjusted for modern XGBoost API where labels are passed directly.
+        Custom Asymmetric Log Loss for XGBoost.
         """
         # Numerically stable sigmoid mapped from log-odds margin
         p = 1.0 / (1.0 + np.exp(-np.clip(preds, -15, 15)))
@@ -70,8 +66,8 @@ class ActuarialModelEngine(BaseEstimator, ClassifierMixin):
         return grad, hess
 
     def fit(self, X: pd.DataFrame, y: pd.Series) -> 'ActuarialModelEngine':
-        """Trains the underlying model engine."""
-        logger.info(f"Commencing training sequence for {self.model_name.upper()}")
+        """Trains the model."""
+        logger.info(f"Training {self.model_name.upper()}")
         self.model.fit(X, y)
         return self
 
@@ -80,12 +76,10 @@ class ActuarialModelEngine(BaseEstimator, ClassifierMixin):
 
     def predict_proba(self, X: pd.DataFrame) -> np.ndarray:
         """
-        Executes probability inference with safe Margin-to-Sigmoid mapping 
-        for custom objective functions.
+        Predicts probabilities. Handles custom loss margin conversion.
         """
         if self.model_name == "xgboost" and self.custom_loss:
-            # 【外科手术修复 2】：概率防坍塌补丁
-            # 提取 Booster 原生 margin 预测，并强制映射回 [0, 1] 概率空间
+            # Fix: Get margin and manually apply sigmoid to avoid overflow
             dmatrix = xgb.DMatrix(X)
             margin = self.model.get_booster().predict(dmatrix, output_margin=True)
             

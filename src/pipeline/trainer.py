@@ -1,6 +1,6 @@
 """
-Industrial Machine Learning Pipeline and Evaluation Engine.
-Orchestrates the preprocessing, sampling, and modeling stages into a unified DAG.
+Pipeline wrapper for training and evaluation.
+Handles the training loop and cross-validation.
 """
 
 import logging
@@ -16,8 +16,7 @@ logger = logging.getLogger(__name__)
 
 class ActuarialPipelineEngine:
     """
-    Unified engine to compile and evaluate the end-to-end machine learning pipeline.
-    Ensures strict isolation of train/validation folds to prevent data leakage.
+    Wrapper to manage the imblearn pipeline and cross-validation.
     """
 
     def __init__(self, preprocessor: Any, sampler: Optional[Any], classifier: Any):
@@ -34,8 +33,7 @@ class ActuarialPipelineEngine:
 
     def _build_pipeline(self) -> ImbPipeline:
         """
-        Compiles the components into an imblearn Pipeline (DAG).
-        This guarantees that resampling is strictly applied ONLY to the training splits.
+        Builds the imblearn Pipeline.
         """
         steps = [("preprocessor", self.preprocessor)]
         
@@ -44,17 +42,14 @@ class ActuarialPipelineEngine:
             
         steps.append(("model", self.classifier))
         
-        logger.info("DAG Pipeline compiled successfully.")
+        logger.info("Pipeline built.")
         return ImbPipeline(steps)
 
     def cross_validate(self, X: pd.DataFrame, y: pd.Series, n_splits: int = 5) -> Dict[str, float]:
         """
-        Executes rigorous Stratified K-Fold Cross-Validation.
-        
-        Returns:
-            Dict: Aggregated out-of-fold metrics (mean and standard deviation).
+        Runs Stratified K-Fold Cross-Validation.
         """
-        logger.info(f"Initiating {n_splits}-Fold Stratified Cross-Validation...")
+        logger.info(f"Starting {n_splits}-Fold CV...")
         
         skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=42)
         
@@ -63,20 +58,20 @@ class ActuarialPipelineEngine:
         cv_f1s = []
 
         for fold, (train_idx, val_idx) in enumerate(skf.split(X, y), 1):
-            # Strict isolation of training and validation indices
+            # Split data
             X_train_fold, y_train_fold = X.iloc[train_idx], y.iloc[train_idx]
             X_val_fold, y_val_fold = X.iloc[val_idx], y.iloc[val_idx]
 
-            # Fit the entire DAG pipeline strictly on the training fold
+            # Fit pipeline
             self.pipeline.fit(X_train_fold, y_train_fold)
 
-            # Inference on the untouched validation fold
+            # Predict
             y_pred = self.pipeline.predict(X_val_fold)
             
-            # Probability inference for AUC (fallback to hard labels if unsupported)
-            if hasattr(self.pipeline.named_steps['model'], "predict_proba"):
+            # Get probabilities if available
+            try:
                 y_proba = self.pipeline.predict_proba(X_val_fold)[:, 1]
-            else:
+            except (NotImplementedError, AttributeError):
                 y_proba = y_pred
 
             # Compute fold metrics
@@ -99,12 +94,12 @@ class ActuarialPipelineEngine:
 
     def fit_production(self, X_train: pd.DataFrame, y_train: pd.Series) -> 'ActuarialPipelineEngine':
         """
-        Trains the pipeline on the full training dataset for production deployment.
+        Fits the model on the full training set.
         """
-        logger.info("Training production model on full training set...")
+        logger.info("Fitting model on full data...")
         self.pipeline.fit(X_train, y_train)
         return self
 
     def predict_production(self, X_test: pd.DataFrame) -> np.ndarray:
-        """Executes inference using the production-ready pipeline."""
+        """Predicts on new data."""
         return self.pipeline.predict(X_test)

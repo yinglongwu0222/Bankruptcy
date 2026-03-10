@@ -1,7 +1,5 @@
 """
-Industrial Entry Point for Actuarial Default Prediction.
-Orchestrates the DAG pipeline, ensuring zero data leakage, strict CV evaluation,
-and automated generation of visual performance reports.
+Main script for training and evaluation.
 """
 
 import logging
@@ -45,7 +43,7 @@ def main():
             sampler = SamplerFactory.get_sampler(method_name=sampler_name)
             params = ModelConfigFactory.get_params(model_name)
             
-            # 【外科手术修复 1】：逻辑互斥设计 (A/B Test)
+            # Use custom loss only for XGBoost without sampling
             use_custom_loss = (model_name == "xgboost" and sampler_name.lower() == "none")
             
             classifier = ActuarialModelEngine(
@@ -60,19 +58,18 @@ def main():
                 classifier=classifier
             )
 
-            # --- Stage 1: Rigorous Cross-Validation ---
+            # --- Stage 1: Cross-Validation ---
             cv_results = pipeline_engine.cross_validate(X_train, y_train, n_splits=5)
             logger.info(f"CV Results for {model_name.upper()} + {sampler_name}: {cv_results}")
 
-            # --- Stage 2: Production Training & Visual Reporting ---
-            logger.info("Executing Production Fit on full training data...")
+            # --- Stage 2: Final Training & Reporting ---
+            logger.info("Fitting on full training data...")
             pipeline_engine.fit_production(X_train, y_train)
 
-            logger.info("Executing inference on untouched Hold-out Test Set...")
+            logger.info("Predicting on test set...")
             y_pred = pipeline_engine.predict_production(X_test)
             
-            # 【架构修复】：必须通过 pipeline.predict_proba 调用！
-            # 确保 X_test 先经过 preprocessor 降维 (96 -> 58 特征)，再进入分类器，防止维度灾难
+            # Use pipeline.predict_proba to ensure preprocessing is applied correctly
             try:
                 y_proba = pipeline_engine.pipeline.predict_proba(X_test)[:, 1]
             except (NotImplementedError, AttributeError):
